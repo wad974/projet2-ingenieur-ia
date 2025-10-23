@@ -1,3 +1,9 @@
+# Guide Complet - API Hugging Face pour la Segmentation Vestimentaire
+# ModeTrends - Fashion Trend Intelligence
+
+# ============================================================
+# CLASS MAPPING & COLORMAPS
+# ============================================================
 
 import os
 from dotenv import load_dotenv
