@@ -162,6 +162,8 @@ else :
     # 6. AFFICHAGE DES RÉSULTATS EN BATCH
     # ============================================================
     
+    successes=int()
+    failures=int()
     # Afficher les résultats du batch
     if batch_seg_results:
         display_segmented_images_batch(image_paths, batch_seg_results)
@@ -182,5 +184,6 @@ else :
     print("="*60)
     print(f"✅ Segmentations réussies : {successes}/{len(batch_seg_results)}")
     print(f"❌ Échecs : {failures}/{len(batch_seg_results)}")
-    print(f"📈 Taux de réussite : {(successes/len(batch_seg_results)*100):.1f}%")
+    if successes != 0:
+        print(f"📈 Taux de réussite : {(successes/len(batch_seg_results)*100):.1f}%")
     print("="*60)
