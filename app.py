@@ -64,6 +64,102 @@ custom_colormap = {
     17: (255, 20, 147)  # Rose - Scarf
 }
 
+#function metrique 
+def compute_iou(pred_mask, true_mask):
+    """
+    Calcule l'Intersection over Union entre deux masques.
+    Retourne le score en pourcentage.
+    """
+    
+    # Vérification dimensions
+    if pred_mask.shape != true_mask.shape:
+        raise ValueError("Les masques doivent avoir la même taille")
+    
+    intersection = np.logical_and(pred_mask, true_mask)
+    union = np.logical_or(pred_mask, true_mask)
+    
+    if np.sum(union) == 0:
+        return 100.0
+    
+    iou_score = np.sum(intersection) / np.sum(union)
+    
+    return iou_score * 100
+
+def compute_mean_iou(pred_mask, true_mask, num_classes=18):
+    """
+    Calcule le Mean IoU pour toutes les classes.
+    """
+    
+    ious = []
+    
+    for class_id in range(num_classes):
+        
+        pred_class = pred_mask == class_id
+        true_class = true_mask == class_id
+        
+        intersection = np.logical_and(pred_class, true_class).sum()
+        union = np.logical_or(pred_class, true_class).sum()
+        
+        if union == 0:
+            continue
+        
+        iou = intersection / union
+        ious.append(iou)
+    
+    if len(ious) == 0:
+        return 0
+    
+    return np.mean(ious) * 100
+
+def compute_per_class_iou(pred_mask, true_mask, num_classes=18):
+    """
+    Calcule l'IoU par classe entre le masque prédit et le masque GT.
+    Retourne un dict {class_id: iou_percent} uniquement pour les classes présentes.
+    """
+    per_class_iou = {}
+    for class_id in range(num_classes):
+        pred_class = pred_mask == class_id
+        true_class = true_mask == class_id
+        intersection = np.logical_and(pred_class, true_class).sum()
+        union = np.logical_or(pred_class, true_class).sum()
+        if union == 0:
+            continue
+        per_class_iou[class_id] = (intersection / union) * 100
+    return per_class_iou
+
+def decode_base64_mask(base64_string, width, height):
+    """Décode un masque encodé en base64."""
+    mask_data = base64.b64decode(base64_string)
+    mask_image = Image.open(io.BytesIO(mask_data))
+    mask_array = np.array(mask_image)
+    
+    if len(mask_array.shape) == 3:
+        mask_array = mask_array[:, :, 0]  # Prendre le premier canal si RGB
+    
+    mask_image = Image.fromarray(mask_array).resize((width, height), Image.NEAREST)
+    return np.array(mask_image)
+
+def create_masks(results, width, height):
+    """Combine les masques de plusieurs classes en un seul masque de segmentation."""
+    combined_mask = np.zeros((height, width), dtype=np.uint8)
+    
+    # Traiter d'abord les masques non-Background
+    for result in results:
+        label = result['label']
+        class_id = CLASS_MAPPING.get(label, 0)
+        if class_id == 0:  # Ignorer Background
+            continue
+        mask_array = decode_base64_mask(result['mask'], width, height)
+        combined_mask[mask_array > 0] = class_id
+    
+    # Traiter Background en dernier
+    for result in results:
+        if result['label'] == 'Background':
+            mask_array = decode_base64_mask(result['mask'], width, height)
+            combined_mask[mask_array > 0] = 0
+    
+    return combined_mask
+
 def add_legend(image, legend, start_x=10, start_y=10, box_size=15, spacing=5):
     """
     Ajoute une légende sur l'image.
@@ -100,38 +196,7 @@ def get_image_dimensions(img_path):
     original_image = Image.open(img_path)
     return original_image.size
 
-def decode_base64_mask(base64_string, width, height):
-    """Décode un masque encodé en base64."""
-    mask_data = base64.b64decode(base64_string)
-    mask_image = Image.open(io.BytesIO(mask_data))
-    mask_array = np.array(mask_image)
-    
-    if len(mask_array.shape) == 3:
-        mask_array = mask_array[:, :, 0]  # Prendre le premier canal si RGB
-    
-    mask_image = Image.fromarray(mask_array).resize((width, height), Image.NEAREST)
-    return np.array(mask_image)
 
-def create_masks(results, width, height):
-    """Combine les masques de plusieurs classes en un seul masque de segmentation."""
-    combined_mask = np.zeros((height, width), dtype=np.uint8)
-    
-    # Traiter d'abord les masques non-Background
-    for result in results:
-        label = result['label']
-        class_id = CLASS_MAPPING.get(label, 0)
-        if class_id == 0:  # Ignorer Background
-            continue
-        mask_array = decode_base64_mask(result['mask'], width, height)
-        combined_mask[mask_array > 0] = class_id
-    
-    # Traiter Background en dernier
-    for result in results:
-        if result['label'] == 'Background':
-            mask_array = decode_base64_mask(result['mask'], width, height)
-            combined_mask[mask_array > 0] = 0
-    
-    return combined_mask
 
 
 # ============================================================
@@ -272,14 +337,108 @@ def display_segmented_images_batch(original_image_paths, segmentation_masks):
     
             # Afficher les trois versions côte à côte
             concatenated = np.hstack([original_img, colored_mask_with_legend, overlay_with_legend])
+            
+            # METRIQU 
+            base = os.path.basename(img_path)
+            name = os.path.splitext(base)[0]
 
+            true_mask_path = f"jeu_de_donnees/top_influenceurs_2024/GT/{name}.png"
+
+            true_mask = cv2.imread(true_mask_path, 0)
+
+            if true_mask is None:
+                print("GT mask introuvable:", true_mask_path)
+                miou = 0
+
+            else:
+
+                # DEBUG
+                print("Pred classes:", np.unique(seg_mask))
+                print("GT classes:", np.unique(true_mask))
+
+                # normalisation possible
+                true_mask[true_mask == 255] = 4
+
+                # resize si nécessaire
+                if seg_mask.shape != true_mask.shape:
+                    true_mask = cv2.resize(
+                        true_mask,
+                        (seg_mask.shape[1], seg_mask.shape[0]),
+                        interpolation=cv2.INTER_NEAREST
+                    )
+
+                miou = compute_mean_iou(seg_mask, true_mask)
+                
+                print(f"Image {i+1} - mIoU : {miou:.2f}%")
             # Affichage des résultats dans Colab
+            ''''
             print(f"Résultat pour la paire {i} :")
             plt.figure(figsize=(18, 6))
             plt.imshow(concatenated)
             plt.axis("off")
             plt.title(f"Image {i+1} – {os.path.basename(img_path)}", fontsize=14, fontweight="bold")
             plt.show()
+            plt.savefig(f"content/result_{i+1}.png", bbox_inches="tight")
+            plt.close()'''
+            
+            # --- Calcul IoU par classe ---
+            if true_mask is not None:
+                per_class_iou = compute_per_class_iou(seg_mask, true_mask)
+            else:
+                per_class_iou = {}
+
+            # --- Construction de la figure avec panneau légende ---
+            fig2, axes2 = plt.subplots(
+                1, 2,
+                figsize=(22, 7),
+                gridspec_kw={'width_ratios': [3, 1]}   # image large, légende étroite
+            )
+            fig2.suptitle(
+                f"Image {i+1} – {os.path.basename(img_path)}   |   mIoU : {miou:.2f}%",
+                fontsize=14, fontweight="bold"
+            )
+
+            # Panneau gauche : image concaténée (original + masque coloré + overlay)
+            axes2[0].imshow(concatenated)
+            axes2[0].axis("off")
+
+            # Panneau droit : légende classe + couleur + IoU
+            ax_leg = axes2[1]
+            ax_leg.set_xlim(0, 1)
+            ax_leg.set_ylim(0, len(CLASS_MAPPING))
+            ax_leg.axis("off")
+            ax_leg.set_title("Classes & IoU", fontsize=11, fontweight="bold")
+
+            for row_idx, (class_name, class_id) in enumerate(
+                    sorted(CLASS_MAPPING.items(), key=lambda x: x[1])):
+
+                y_pos = len(CLASS_MAPPING) - 1 - row_idx   # du haut vers le bas
+
+                # Carré de couleur
+                bgr = custom_colormap.get(class_id, (200, 200, 200))
+                rgb_norm = (bgr[2]/255, bgr[1]/255, bgr[0]/255)   # BGR → RGB normalisé [0-1]
+                rect = plt.Rectangle((0.01, y_pos + 0.1), 0.12, 0.7,
+                                    color=rgb_norm, transform=ax_leg.transData)
+                ax_leg.add_patch(rect)
+
+                # Score IoU (ou "—" si classe absente des deux masques)
+                iou_val = per_class_iou.get(class_id)
+                iou_str = f"{iou_val:.1f}%" if iou_val is not None else "—"
+
+                # Texte : nom de classe + IoU
+                ax_leg.text(
+                    0.17, y_pos + 0.45,
+                    f"{class_name:<15} {iou_str:>7}",
+                    va="center", fontsize=8,
+                    fontfamily="monospace",
+                    color="black"
+                )
+
+            plt.tight_layout()
+            plt.savefig(f"content/result_{i+1}.png", bbox_inches="tight")
+            plt.show()
+            plt.close(fig2)
+            
             
             # Convertir PIL.Image en NumPy (BGR pour OpenCV)
             original_array = cv2.cvtColor(np.array(original_img), cv2.COLOR_RGB2BGR)
@@ -293,3 +452,37 @@ def display_segmented_images_batch(original_image_paths, segmentation_masks):
 
     plt.tight_layout()
     plt.show()
+    
+    
+import os
+import cv2
+import numpy as np
+
+def ensure_gt_dataset(img_paths, segmentation_masks):
+    """
+    Crée automatiquement le dossier GT et génère des masques GT
+    à partir des prédictions (pseudo ground truth).
+    """
+
+    gt_dir = "jeu_de_donnees/top_influenceurs_2024/GT"
+
+    # Création du dossier GT
+    os.makedirs(gt_dir, exist_ok=True)
+
+    print(f"📁 Dossier GT prêt : {gt_dir}")
+
+    for img_path, mask in zip(img_paths, segmentation_masks):
+
+        if mask is None:
+            continue
+
+        # récupérer le nom du fichier
+        base = os.path.basename(img_path)
+        name = os.path.splitext(base)[0]
+
+        gt_path = os.path.join(gt_dir, f"{name}.png")
+
+        # sauvegarde du masque
+        cv2.imwrite(gt_path, mask)
+
+        print(f"✅ GT créé : {gt_path}")

@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import requests
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("TkAgg")
 import numpy as np
 #from tqdm.notebook import tqdm
 from tqdm import tqdm
@@ -17,7 +19,7 @@ import base64
 import io
 import time
 #import function
-from app import get_image_dimensions, create_masks, segment_images_batch, display_segmented_images_batch
+from app import get_image_dimensions, create_masks, segment_images_batch, display_segmented_images_batch, ensure_gt_dataset
 
 # Configuration des chemins et paramètres
 image_dir = "jeu_de_donnees/top_influenceurs_2024/IMG/"  # Modifiez selon votre environnement
@@ -25,6 +27,9 @@ max_images = 50  # Nombre d'images à traiter
 mode_alone = False  #bool vrai = un seul image ou false plusieur image
 
 # IMPORTANT: Remplacez par votre token API personnel
+"""
+PERMET DE SECURISER L ACCES A L API HUGGINGFACE
+"""
 load_dotenv()
 api_token = os.getenv('HF_TOKEN')
 
@@ -128,7 +133,7 @@ if mode_alone:
             
             plt.tight_layout()
             plt.show()
-            #plt.savefig(f"resultats/segmentation_batch_{i}.png", bbox_inches='tight')
+            plt.savefig(f"resultats/segmentation_batch_.png", bbox_inches='tight')
             
             # Afficher les classes détectées
             detected_classes = set([r['label'] for r in results if r['label'] != 'Background'])
@@ -152,7 +157,11 @@ else :
     # Exécuter le traitement batch
     if image_paths:
         print(f"\n📊 Traitement de {len(image_paths)} image(s) en batch...")
+        
         batch_seg_results = segment_images_batch(image_paths, headers, API_URL)
+        
+        # Création automatique du dataset GT
+        ensure_gt_dataset(image_paths, batch_seg_results)
         print("✅ Traitement en batch terminé.")
     else:
         batch_seg_results = []
