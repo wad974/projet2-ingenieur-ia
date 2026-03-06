@@ -1,4 +1,4 @@
-# 🗂 PROJET 2 - AI ENGENEER
+# 🗂 PROJET 2 - AI ENGINEER
 # 👗 ModeTrends — Fashion Trend Intelligence
 
 > Segmentation vestimentaire automatique via l'API Hugging Face (SegFormer B3 Clothes)
@@ -245,4 +245,4 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ---
 
-*ModeTrends _ Projet 2 AI ENGEENER — Powered by [JCWAD](https://www.jcwad.re) - [Hugging Face](https://huggingface.co/) & SegFormer B3*
+*ModeTrends _ Projet 2 AI ENGINEER — Powered by [JCWAD](https://www.jcwad.re) - [Hugging Face](https://huggingface.co/) & SegFormer B3*
