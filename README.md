@@ -80,8 +80,8 @@ python-dotenv
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/votre-utilisateur/modetrends.git
-cd modetrends
+git clone https://github.com/wad974/projet2-ingenieur-ia
+cd projet2-ingenieur-ia
 
 # 2. Créer un environnement virtuel
 python -m venv venv
@@ -245,4 +245,4 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ---
 
-*ModeTrends — Powered by [Hugging Face](https://huggingface.co/) & SegFormer B3*
+*ModeTrends _ Projet 2 AI ENGEENER — Powered by [JCWAD](https://www.jcwad.re) [Hugging Face](https://huggingface.co/) & SegFormer B3*
